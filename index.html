@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#17152a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>My Card Gacha</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="topbar">
+  <div><div class="eyebrow">PERSONAL CARD COLLECTION</div><h1>My Card Gacha</h1></div>
+  <div class="ticket"><span>🎟</span><div><b id="ticketCount">0</b><small>ガチャ権利</small></div></div>
+</header>
+<nav class="tabs" aria-label="メインメニュー">
+  <button class="tab active" data-page="gacha">ガチャ</button>
+  <button class="tab" data-page="collection">図鑑</button>
+  <button class="tab" data-page="team">チーム</button>
+  <button class="tab" data-page="manage">カード登録</button>
+</nav>
+<main>
+<section class="page active" id="page-gacha">
+  <div class="hero panel">
+    <div class="eyebrow">ONE TICKET EVERY HOUR</div>
+    <h2>次の1枚との出会い。</h2>
+    <p>ガチャ権利は1時間ごとに1回分追加。使わなかった分は蓄積されます。</p>
+    <div class="ticket-line"><span>所持権利</span><strong id="ticketCountLarge">0回</strong></div>
+    <p class="muted" id="nextTicket">次の権利を計算中…</p>
+    <div class="actions"><button class="primary" id="pullOne">1回引く</button><button class="secondary" id="pullTen">10連で引く</button></div>
+  </div>
+  <div class="panel">
+    <div class="section-heading"><h3>排出対象</h3><button class="text-btn" data-goto="manage">キャラを登録 →</button></div>
+    <div class="rarities"><span class="rarity n">N</span><span class="rarity r">R</span><span class="rarity sr">SR</span><span class="rarity ssr">SSR</span></div>
+    <p class="muted">登録したキャラクターのうち「ガチャ対象」がONのカードから抽選します。排出率は登録済みカードのレアリティに応じた重み付けです。</p>
+  </div>
+  <div id="recentPulls" class="panel"><h3>最近の獲得</h3><p class="muted">まだガチャ結果はありません。</p></div>
+</section>
+
+<section class="page" id="page-collection">
+  <div class="section-heading"><div><div class="eyebrow">YOUR ARCHIVE</div><h2>カード図鑑</h2></div><span id="collectionCount" class="pill">0枚</span></div>
+  <div class="filters panel">
+    <input id="searchCards" placeholder="名前で検索">
+    <select id="rarityFilter"><option value="">全レアリティ</option><option>N</option><option>R</option><option>SR</option><option>SSR</option></select>
+    <select id="sortCards"><option value="newest">入手順（新しい順）</option><option value="name">名前順</option><option value="rarity">レアリティ順</option><option value="looks">looksが高い順</option><option value="style">styleが高い順</option><option value="level">レベルが高い順</option><option value="awakening">覚醒が高い順</option></select>
+  </div>
+  <div id="collectionGrid" class="card-grid"></div>
+</section>
+
+<section class="page" id="page-team">
+  <div class="section-heading"><div><div class="eyebrow">YOUR LINEUP</div><h2>選抜チーム</h2></div></div>
+  <div class="panel">
+    <label for="teamSize">チーム人数</label>
+    <div class="inline"><input id="teamSize" type="number" min="1" max="30" value="5"><button id="saveTeamSize" class="secondary">人数を設定</button></div>
+    <p class="muted">空き枠をタップして所持カードを選びます。人数は1〜30人で変更できます。</p>
+    <div class="team-stats"><div><small>合計 looks</small><b id="teamLooks">0</b></div><div><small>合計 style</small><b id="teamStyle">0</b></div></div>
+  </div>
+  <div id="teamSlots" class="team-slots"></div>
+</section>
+
+<section class="page" id="page-manage">
+  <div class="section-heading"><div><div class="eyebrow">CARD STUDIO</div><h2>キャラクター登録</h2></div></div>
+  <form id="cardForm" class="panel form">
+    <input type="hidden" id="editingId">
+    <label>キャラクター画像<input id="cardImage" type="file" accept="image/*"></label>
+    <div id="imagePreview" class="image-preview"><span>画像プレビュー</span></div>
+    <label>キャラクター名<input id="cardName" required maxlength="60" placeholder="例：キャラクターA"></label>
+    <label>レアリティ<select id="cardRarity"><option>N</option><option>R</option><option>SR</option><option>SSR</option></select></label>
+    <div class="two-col">
+      <label>初期 looks（0〜100）<input id="cardLooks" type="number" min="0" max="100" value="50" required></label>
+      <label>初期 style（0〜100）<input id="cardStyle" type="number" min="0" max="100" value="50" required></label>
+    </div>
+    <label>レベルごとの上昇量 <small>（仮設定。後から変更できます）</small><input id="growthRate" type="number" min="0" max="10" step="0.1" value="0.5"></label>
+    <label class="check"><input id="gachaEnabled" type="checkbox" checked> ガチャの排出対象にする</label>
+    <div class="actions"><button class="primary" type="submit">カードを保存</button><button class="secondary" type="button" id="cancelEdit" hidden>編集をキャンセル</button></div>
+    <p class="muted">登録した時点では図鑑マスターに追加されます。ガチャで獲得するとLv.1の所持カードになります。</p>
+  </form>
+  <div class="section-heading"><h3>登録済みキャラクター</h3></div>
+  <div id="masterList" class="master-list"></div>
+  <div class="panel danger-zone"><h3>データ管理</h3><p class="muted">このブラウザ内に保存されます。ブラウザのデータ消去で消える可能性があるため、定期的にバックアップしてください。</p><div class="actions"><button class="secondary" id="exportData">バックアップを書き出す</button><label class="secondary file-button">バックアップを読み込む<input id="importData" type="file" accept="application/json"></label></div><button class="danger" id="resetAll">すべてのデータを削除</button></div>
+</section>
+</main>
+
+<div id="modal" class="modal" hidden><div class="modal-backdrop" data-close="true"></div><div class="modal-content"><button class="close" id="closeModal">×</button><div id="modalBody"></div></div></div>
+<div id="toast" class="toast" role="status"></div>
+<script src="app.js"></script>
+</body>
+</html>

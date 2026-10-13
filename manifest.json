@@ -1,0 +1,10 @@
+{
+  "name": "My Card Gacha",
+  "short_name": "Card Gacha",
+  "description": "自分専用のカード収集・育成ガチャ",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#100f1d",
+  "theme_color": "#17152a",
+  "icons": []
+}
