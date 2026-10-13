@@ -1,66 +1,198 @@
+(() => {
+"use strict";
+const SAVE_KEY = "myIdolGachaSave";
+const VERSION = 3;
 const $ = id => document.getElementById(id);
-const STORE = "my-card-gacha-v1";
-const HOUR = 60 * 60 * 1000;
-let state = loadState();
-let pendingImage = "";
-let toastTimer;
+const RARITIES = ["N","R","SR","SSR"];
+const CAPS = {N:20,R:30,SR:40,SSR:50};
+const EXP_NEXT = lv => 50 + 10 * (lv - 1);
+const MAX_STAMINA = 100, STAMINA_MS = 5 * 60 * 1000, TICKET_MS = 60 * 60 * 1000;
+const uid = () => "id_" + Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+const now = () => Date.now();
+let state, currentTeamId = null, lastTick = now();
 
-function localDateKey(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`}
-function defaultState(){return {master:[],owned:[],tickets:0,lastTicketAt:Date.now(),teamSize:5,team:[],teamLeaderId:null,recent:[],nextId:1,stamina:100,staminaUpdatedAt:Date.now(),specialLessonDate:localDateKey(),specialLessonsUsed:0};}
-function loadState(){try{const s=JSON.parse(localStorage.getItem(STORE));return s?{...defaultState(),...s,owned:(s.owned||[]).map(c=>({...c,exp:Number(c.exp)||0}))}:defaultState()}catch{return defaultState()}}
-function save(){localStorage.setItem(STORE,JSON.stringify(state));renderAll()}
-function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-function toast(msg){$("toast").textContent=msg;$("toast").classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>$("toast").classList.remove("show"),2400)}
-function rarityRank(r){return ({N:1,R:2,SR:3,SSR:4})[r]||0}
-function masterById(id){return state.master.find(x=>x.id===id)}
-function ownedById(id){return state.owned.find(x=>x.id===id)}
-function cardName(c){return masterById(c.masterId)?.name||c.name||"削除されたキャラクター"}
-function cardImage(c){return masterById(c.masterId)?.image||c.image||""}
-function baseStats(c){const m=masterById(c.masterId)||c;const levels=Math.max(0,(c.level||1)-1);return {looks:Math.min(100,Math.floor((Number(m.looks)||0)+levels*0.5+1e-9)),style:Math.min(100,Math.floor((Number(m.style)||0)+levels*0.5+1e-9))}}
-function maxLevel(c){const r=(masterById(c.masterId)||c).rarity;return ({N:20,R:30,SR:40,SSR:50})[r]||50}
-const STAMINA_MAX=100, STAMINA_INTERVAL=5*60*1000;
-function accrueStamina(){const now=Date.now();if(!Number.isFinite(state.stamina))state.stamina=100;if(!state.staminaUpdatedAt)state.staminaUpdatedAt=now;state.stamina=Math.max(0,Math.min(STAMINA_MAX,Number(state.stamina)));if(state.stamina>=STAMINA_MAX){state.stamina=STAMINA_MAX;state.staminaUpdatedAt=now;return}const elapsed=Math.max(0,now-state.staminaUpdatedAt);const gained=Math.floor(elapsed/STAMINA_INTERVAL);if(gained>0){state.stamina=Math.min(STAMINA_MAX,state.stamina+gained);state.staminaUpdatedAt+=gained*STAMINA_INTERVAL;if(state.stamina>=STAMINA_MAX)state.staminaUpdatedAt=now;localStorage.setItem(STORE,JSON.stringify(state))}}
-function expNeeded(level){return 50+10*(level-1)}
-function updateStaminaUI(){accrueStamina();const el=$("staminaCount");if(!el)return;const n=Math.floor(state.stamina);el.textContent=n;$("staminaBar").style.width=`${n}%`;const remain=STAMINA_INTERVAL-(Date.now()-state.staminaUpdatedAt);$("staminaRecovery").textContent=n>=STAMINA_MAX?"スタミナ満タン！回復時間は停止中です。":"次の1回復まで "+formatTime(remain)+"（アプリを閉じていても回復）";const date=localDateKey();if(state.specialLessonDate!==date){state.specialLessonDate=date;state.specialLessonsUsed=0;localStorage.setItem(STORE,JSON.stringify(state))}}
-function renderLessonCards(){const el=$("lessonCard");if(!el)return;const previous=el.value;el.innerHTML='<option value="">所持カードから選択</option>'+state.owned.map(c=>`<option value="${c.id}">${esc(cardName(c))}（${(masterById(c.masterId)||{}).rarity||"?"}・Lv.${c.level}/${maxLevel(c)}・${c.exp||0} EXP）</option>`).join("");if(state.owned.some(c=>String(c.id)===previous))el.value=previous}
-function doLesson(type){accrueStamina();const c=ownedById(Number($("lessonCard").value));if(!c){toast("先にレッスンするカードを選んでください");return}const info={vocal:{cost:20,exp:20},dance:{cost:30,exp:30},special:{cost:50,exp:50}}[type];if(!info)return;if(c.level>=maxLevel(c)){toast("このカードは最大レベルです");return}if(state.stamina<info.cost){toast("スタミナが足りません");return}if(type==="special"){const today=localDateKey();if(state.specialLessonDate!==today){state.specialLessonDate=today;state.specialLessonsUsed=0}if(state.specialLessonsUsed>=3){toast("特別レッスンは1日3回までです");return}state.specialLessonsUsed++}state.stamina-=info.cost;c.exp=(Number(c.exp)||0)+info.exp;let levels=0;while(c.level<maxLevel(c)&&c.exp>=expNeeded(c.level)){c.exp-=expNeeded(c.level);c.level++;levels++}if(c.level>=maxLevel(c))c.exp=0;localStorage.setItem(STORE,JSON.stringify(state));renderAll();$("lessonMessage").textContent=`${cardName(c)}：+${info.exp} EXP`+(levels?`、${levels}レベルアップ！ Lv.${c.level}`:`。次のLv.まで ${Math.max(0,expNeeded(c.level)-(c.exp||0))} EXP`)+(type==="special"?`（特別レッスン ${state.specialLessonsUsed}/3）`:"");toast(levels?`レベルアップ！ Lv.${c.level}`:"レッスン完了！")} 
-function effectiveStats(c){return baseStats(c)}
-function accrueTickets(){const now=Date.now();if(!state.lastTicketAt)state.lastTicketAt=now;const elapsed=Math.max(0,now-state.lastTicketAt);const earned=Math.floor(elapsed/HOUR);if(earned>0){state.tickets+=earned;state.lastTicketAt+=earned*HOUR;localStorage.setItem(STORE,JSON.stringify(state))}}
-function formatTime(ms){const sec=Math.max(0,Math.ceil(ms/1000));return `${Math.floor(sec/60)}分${String(sec%60).padStart(2,"0")}秒`}
-function updateTicketUI(){accrueTickets();$("ticketCount").textContent=state.tickets;$("ticketCountLarge").textContent=`${state.tickets}回`;const remain=HOUR-(Date.now()-state.lastTicketAt);$("nextTicket").textContent=state.tickets>0?`次の権利まで ${formatTime(remain)}（権利は上限なし）`:`次の1回分まで ${formatTime(remain)}`}
-setInterval(updateTicketUI,1000);
-
-function rarityClass(r){return r.toLowerCase()}
-function cardHTML(c,owned=true){const m=masterById(c.masterId)||c;const st=owned?effectiveStats(c):{looks:m.looks,style:m.style};const awake=owned?(c.awakening||0):0;const img=cardImage(c);return `<article class="game-card awake-${awake}">${awake?`<span class="awake-label">✦ 覚醒 ${awake}/5</span>`:""}${img?`<img class="card-image" src="${img}" alt="">`:`<div class="placeholder-image">✦</div>`}<div class="card-title">${esc(cardName(c))}</div><div class="card-meta"><span class="rarity ${rarityClass(m.rarity)}">${esc(m.rarity)}</span><span class="muted">Lv.${owned?c.level:1}</span></div><div class="stats"><span>looks <b>${st.looks}</b></span><span>style <b>${st.style}</b></span></div>${owned?`<div class="card-buttons"><button class="mini-btn" data-action="details" data-id="${c.id}">詳細・育成</button></div>`:""}</article>`}
-function renderCollection(){const q=$("searchCards").value.trim().toLowerCase(),rf=$("rarityFilter").value,sort=$("sortCards").value;let arr=[...state.owned].filter(c=>cardName(c).toLowerCase().includes(q)&&(!rf||(masterById(c.masterId)||{}).rarity===rf));arr.sort((a,b)=>{const ma=masterById(a.masterId)||{},mb=masterById(b.masterId)||{};switch(sort){case"name":return cardName(a).localeCompare(cardName(b),"ja");case"rarity":return rarityRank(mb.rarity)-rarityRank(ma.rarity);case"looks":return effectiveStats(b).looks-effectiveStats(a).looks;case"style":return effectiveStats(b).style-effectiveStats(a).style;case"level":return b.level-a.level;case"awakening":return (b.awakening||0)-(a.awakening||0);default:return b.obtainedAt-a.obtainedAt}});$("collectionCount").textContent=`${state.owned.length}枚`; $("collectionGrid").innerHTML=arr.length?arr.map(c=>cardHTML(c)).join(""):`<div class="empty">カードがありません。ガチャを引くか、先にキャラクターを登録してください。</div>`}
-function renderMaster(){const el=$("masterList");el.innerHTML=state.master.length?state.master.map(m=>`<div class="master-item">${m.image?`<img src="${m.image}" alt="">`:`<div class="master-placeholder">✦</div>`}<div class="master-info"><b>${esc(m.name)}</b><small>${m.rarity} · 初期 looks ${m.looks} / style ${m.style} · ガチャ${m.gachaEnabled?"対象":"対象外"}</small></div><div class="master-actions"><button class="secondary" data-action="edit-master" data-id="${m.id}">編集</button><button class="secondary" data-action="toggle-gacha" data-id="${m.id}">${m.gachaEnabled?"対象OFF":"対象ON"}</button></div></div>`).join(""):`<div class="empty">キャラクターを登録してください。</div>`}
-function renderTeam(){const slots=$("teamSlots");$("teamSize").value=state.teamSize;let valid=state.team.filter(id=>ownedById(id));state.team=valid.slice(0,state.teamSize);if(!state.team.includes(state.teamLeaderId))state.teamLeaderId=null;const cards=state.team.map(ownedById).filter(Boolean);$("teamLooks").textContent=cards.reduce((s,c)=>s+effectiveStats(c).looks,0);$("teamStyle").textContent=cards.reduce((s,c)=>s+effectiveStats(c).style,0);slots.innerHTML=Array.from({length:state.teamSize},(_,i)=>{const c=ownedById(state.team[i]);return c?`<div class="team-slot">${cardImage(c)?`<img src="${cardImage(c)}" alt="">`:`<div class="placeholder-image">✦</div>`}<b>${esc(cardName(c))}</b><small>Lv.${c.level} · 覚醒${c.awakening||0}${state.teamLeaderId===c.id?" · 👑 リーダー":""}</small><p class="muted">L ${effectiveStats(c).looks} / S ${effectiveStats(c).style}</p><button data-action="set-leader" data-id="${c.id}">${state.teamLeaderId===c.id?"リーダー設定中":"リーダーに設定"}</button><button data-action="remove-team" data-index="${i}">チームから外す</button></div>`:`<button class="team-slot" data-action="add-team" data-index="${i}"><span style="font-size:25px">＋</span><b>メンバーを選ぶ</b><small>空き枠 ${i+1}</small></button>`}).join("")}
-function renderRecent(){const el=$("recentPulls");if(!state.recent.length){el.innerHTML='<h3>最近の獲得</h3><p class="muted">まだガチャ結果はありません。</p>';return}el.innerHTML='<h3>最近の獲得</h3><div class="card-grid">'+state.recent.slice(0,4).map(c=>cardHTML(c)).join("")+'</div>'}
-function renderAll(){updateTicketUI();updateStaminaUI();renderCollection();renderMaster();renderTeam();renderRecent();renderLessonCards()}
-function showModal(html){$("modalBody").innerHTML=html;$("modal").hidden=false}
-function closeModal(){$("modal").hidden=true}
-function getPullable(){return state.master.filter(m=>m.gachaEnabled)}
-function pickMaster(){const pool=getPullable();if(!pool.length)return null;const weights={N:55,R:28,SR:13,SSR:4};let weighted=pool.map(m=>({m,w:weights[m.rarity]||1}));const total=weighted.reduce((s,x)=>s+x.w,0);let n=Math.random()*total;for(const x of weighted){n-=x.w;if(n<=0)return x.m}return weighted[weighted.length-1].m}
-function pull(count){accrueTickets();if(state.tickets<count){toast(`ガチャ権利が足りません（必要 ${count}回）`);return}if(!getPullable().length){toast("ガチャ対象のキャラクターを登録してください");gotoPage("manage");return}state.tickets-=count;const results=[];for(let i=0;i<count;i++){const m=pickMaster();const c={id:state.nextId++,masterId:m.id,level:1,awakening:0,obtainedAt:Date.now()+i};state.owned.push(c);results.push(c)}state.recent=[...results,...state.recent].slice(0,10);localStorage.setItem(STORE,JSON.stringify(state));renderAll();showModal(`<div class="eyebrow" style="text-align:center">GACHA RESULT</div><div class="result-title">${count===10?"10連ガチャ結果":"ガチャ結果"}</div><div class="result-note">新しいカードを獲得しました！</div><div class="result-grid">${results.map(c=>cardHTML(c)).join("")}</div><button class="primary" style="width:100%;margin-top:16px" id="resultOk">OK</button>`);$("resultOk").onclick=closeModal}
-function gotoPage(page){document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.page===page));document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id==="page-"+page));window.scrollTo({top:0,behavior:"smooth"})}
-function openDetails(id){const c=ownedById(Number(id));if(!c)return;const m=masterById(c.masterId)||{},st=effectiveStats(c);const duplicateCount=state.owned.filter(x=>x.id!==c.id&&(masterById(x.masterId)||{}).rarity===m.rarity).length;showModal(`<div class="section-heading"><h2>${esc(cardName(c))}</h2><span class="rarity ${rarityClass(m.rarity)}">${m.rarity}</span></div>${cardHTML(c)}<div class="panel" style="margin-top:12px"><div class="two-col"><div><small class="muted">レベル</small><h2>Lv.${c.level} / ${maxLevel(c)}</h2></div><div><small class="muted">覚醒</small><h2>✦ ${c.awakening||0} / 5</h2></div></div><p>looks：<b>${st.looks}</b> / 100　style：<b>${st.style}</b> / 100</p><p class="muted">レベルが1上がるごとに looks・style がそれぞれ内部値で+0.5。表示は小数点以下を切り捨て、能力値は100が上限です。</p><p>経験値：${c.exp||0} / ${c.level>=maxLevel(c)?"MAX":expNeeded(c.level)}</p><p class="muted">レッスン画面で経験値を獲得するとレベルアップします。</p><button class="primary" id="goLesson">レッスンへ</button><hr style="border-color:var(--line);margin:16px 0"><h3>覚醒</h3><p class="muted">同レアリティの重複カード1枚を消費。能力値は直接上昇せず、カードの発光・枠・エフェクトが変化します。</p><p>覚醒素材候補：${duplicateCount}枚（同レアリティ）</p><button class="primary" id="awaken" ${c.awakening>=5?"disabled":""}>重複カード1枚で覚醒</button><p class="muted">最大覚醒まであと ${5-(c.awakening||0)} 回</p><button class="secondary" id="closeDetails" style="width:100%;margin-top:10px">閉じる</button></div>`);$("closeDetails").onclick=closeModal;$("goLesson").onclick=()=>{closeModal();gotoPage("lesson");renderLessonCards();$("lessonCard").value=String(c.id)};$("awaken").onclick=()=>awakenCard(c.id)}
-function awakenCard(id){const c=ownedById(id);if(!c||c.awakening>=5)return;const rarity=(masterById(c.masterId)||{}).rarity;const material=state.owned.find(x=>x.id!==c.id&&(masterById(x.masterId)||{}).rarity===rarity);if(!material){toast(`覚醒には同レアリティの重複カードが1枚必要です`);return}state.owned=state.owned.filter(x=>x.id!==material.id);state.team=state.team.filter(x=>x!==material.id);if(state.teamLeaderId===material.id)state.teamLeaderId=null;c.awakening=(c.awakening||0)+1;localStorage.setItem(STORE,JSON.stringify(state));renderAll();openDetails(c.id);toast(`覚醒 ${c.awakening}/5 になりました！`)}
-function addToTeam(index){const choices=state.owned.filter(c=>!state.team.includes(c.id));if(!choices.length){toast("チームに追加できるカードがありません");return}showModal(`<h2>チームメンバーを選択</h2><div class="card-grid">${choices.map(c=>`<div>${cardHTML(c)}<button class="primary" style="width:100%;margin-top:6px" data-pick-team="${c.id}">このカードを選ぶ</button></div>`).join("")}</div>`);$("modalBody").querySelectorAll("[data-pick-team]").forEach(b=>b.onclick=()=>{state.team[index]=Number(b.dataset.pickTeam);localStorage.setItem(STORE,JSON.stringify(state));closeModal();renderAll()})}
-function editMaster(id){const m=masterById(Number(id));if(!m)return;$("editingId").value=m.id;$("cardName").value=m.name;$("cardRarity").value=m.rarity;$("cardLooks").value=m.looks;$("cardStyle").value=m.style;$("growthRate").value=m.growthRate;$("gachaEnabled").checked=m.gachaEnabled;pendingImage=m.image||"";$("imagePreview").innerHTML=pendingImage?`<img src="${pendingImage}" alt="">`:"<span>画像プレビュー</span>";$("cancelEdit").hidden=false;gotoPage("manage");window.scrollTo({top:0,behavior:"smooth"})}
-function resetForm(){$("cardForm").reset();$("editingId").value="";$("cardLooks").value=50;$("cardStyle").value=50;$("growthRate").value=.5;$("gachaEnabled").checked=true;pendingImage="";$("imagePreview").innerHTML="<span>画像プレビュー</span>";$("cancelEdit").hidden=true}
-$("cardImage").addEventListener("change",e=>{const f=e.target.files[0];if(!f)return;if(f.size>2*1024*1024){toast("画像は2MB以下にしてください");e.target.value="";return}const r=new FileReader();r.onload=()=>{pendingImage=r.result;$("imagePreview").innerHTML=`<img src="${pendingImage}" alt="">`};r.readAsDataURL(f)});
-$("cardForm").addEventListener("submit",e=>{e.preventDefault();const id=Number($("editingId").value);const m={id:id||state.nextId++,name:$("cardName").value.trim(),rarity:$("cardRarity").value,looks:Math.max(0,Math.min(100,Number($("cardLooks").value))),style:Math.max(0,Math.min(100,Number($("cardStyle").value))),growthRate:Math.max(0,Number($("growthRate").value)||0),gachaEnabled:$("gachaEnabled").checked,image:pendingImage};if(id){const i=state.master.findIndex(x=>x.id===id);if(i>=0)state.master[i]=m}else state.master.push(m);state.nextId=Math.max(state.nextId,m.id+1);save();resetForm();toast("キャラクターを保存しました")});
-$("cancelEdit").onclick=resetForm;
-$("pullOne").onclick=()=>pull(1);$("pullTen").onclick=()=>pull(10);
-document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>gotoPage(b.dataset.page));
-document.querySelectorAll("[data-goto]").forEach(b=>b.onclick=()=>gotoPage(b.dataset.goto));
-$("searchCards").oninput=renderCollection;$("rarityFilter").onchange=renderCollection;$("sortCards").onchange=renderCollection;
-$("saveTeamSize").onclick=()=>{const n=Math.max(1,Math.min(30,Math.floor(Number($("teamSize").value)||1)));state.teamSize=n;state.team=state.team.slice(0,n);save();toast(`チーム人数を${n}人に設定しました`)};
-document.body.addEventListener("click",e=>{const b=e.target.closest("[data-action]");if(!b)return;const id=b.dataset.id,act=b.dataset.action;if(act==="details")openDetails(id);if(act==="edit-master")editMaster(id);if(act==="toggle-gacha"){const m=masterById(Number(id));if(m){m.gachaEnabled=!m.gachaEnabled;save()}}if(act==="add-team")addToTeam(Number(b.dataset.index));if(act==="remove-team"){const removed=state.team[Number(b.dataset.index)];state.team[Number(b.dataset.index)]=null;state.team=state.team.filter(Boolean);if(state.teamLeaderId===removed)state.teamLeaderId=null;save()}if(act==="set-leader"){const leader=Number(b.dataset.id);if(!state.team.includes(leader)){toast("先にチームに追加してください");return}state.teamLeaderId=leader;save();toast("リーダーを設定しました")}});
-$("closeModal").onclick=closeModal;$("modal").addEventListener("click",e=>{if(e.target.dataset.close)closeModal()});
-$("exportData").onclick=()=>{const blob=new Blob([JSON.stringify(state)],{type:"application/json"});const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="my-card-gacha-backup.json";a.click();URL.revokeObjectURL(a.href)};
-$("importData").onchange=e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const x=JSON.parse(r.result);if(!x.master||!x.owned)throw Error();state={...defaultState(),...x};save();toast("バックアップを読み込みました")}catch{toast("バックアップファイルを読み込めませんでした")}};r.readAsText(f);e.target.value=""};
-$("resetAll").onclick=()=>{if(confirm("本当にすべてのカード・権利・設定を削除しますか？")){state=defaultState();save();resetForm();toast("データを削除しました")}};
-document.querySelectorAll("[data-lesson]").forEach(b=>b.onclick=()=>doLesson(b.dataset.lesson));
-setInterval(updateStaminaUI,1000);
-renderAll();
+function defaultState(){return {version:VERSION,characters:[],owned:[],teams:[],tickets:1,ticketUpdatedAt:now(),stamina:100,staminaUpdatedAt:now(),specialDate:localDate(),specialUsed:0};}
+function localDate(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
+function safeParse(s){try{return JSON.parse(s)}catch{return null}}
+function normalizeCharacter(c){
+  if(!c||typeof c!=="object") return null;
+  const name=String(c.name??c.characterName??c.title??"").trim();
+  if(!name)return null;
+  const rarity=RARITIES.includes(c.rarity)?c.rarity:"N";
+  return {id:String(c.id||c.characterId||uid()),name,rarity,looks:clamp(Number(c.looks??c.baseLooks??c.stats?.looks??50),0,100),style:clamp(Number(c.style??c.baseStyle??c.stats?.style??50),0,100),image:typeof c.image==="string"?c.image:(typeof c.imageData==="string"?c.imageData:""),createdAt:c.createdAt||now()};
+}
+function clamp(v,min,max){return Math.max(min,Math.min(max,Number.isFinite(v)?v:min));}
+function normalizeOwned(o, chars){
+  if(!o||typeof o!=="object")return null;
+  const characterId=String(o.characterId||o.charId||o.id||"");
+  const ch=chars.find(c=>c.id===characterId) || chars.find(c=>c.name===o.name);
+  if(!ch)return null;
+  return {id:String(o.id||uid()),characterId:ch.id,level:clamp(Math.floor(Number(o.level)||1),1,CAPS[ch.rarity]),exp:Math.max(0,Number(o.exp??o.experience)||0),awakenings:clamp(Math.floor(Number(o.awakenings??o.awakening)||0),0,5),favorite:!!o.favorite,obtainedAt:o.obtainedAt||now()};
+}
+function normalizeState(raw){
+  const s=defaultState();
+  if(!raw||typeof raw!=="object")return s;
+  s.characters=(Array.isArray(raw.characters)?raw.characters:Array.isArray(raw.characterList)?raw.characterList:[]).map(normalizeCharacter).filter(Boolean);
+  s.owned=(Array.isArray(raw.owned)?raw.owned:Array.isArray(raw.cards)?raw.cards:Array.isArray(raw.inventory)?raw.inventory:[]).map(o=>normalizeOwned(o,s.characters)).filter(Boolean);
+  s.teams=Array.isArray(raw.teams)?raw.teams.map(t=>({id:String(t.id||uid()),name:String(t.name||"マイチーム"),memberIds:Array.isArray(t.memberIds)?t.memberIds.filter(id=>s.owned.some(o=>o.id===id)):Array.isArray(t.members)?t.members.filter(id=>s.owned.some(o=>o.id===id)):[],leaderId:t.leaderId||null})): [];
+  s.tickets=Math.max(0,Math.floor(Number(raw.tickets??raw.gachaTickets??1)||0));
+  s.ticketUpdatedAt=Number(raw.ticketUpdatedAt)||now();
+  s.stamina=clamp(Number(raw.stamina??100),0,MAX_STAMINA);
+  s.staminaUpdatedAt=Number(raw.staminaUpdatedAt)||now();
+  s.specialDate=raw.specialDate||localDate();s.specialUsed=clamp(Number(raw.specialUsed)||0,0,3);
+  // Carry across optional future fields and migration metadata.
+  return s;
+}
+function findLegacy(){
+  const keys=[SAVE_KEY,"idolGachaSave","idolGachaData","my-card-gacha-save","gachaGameData","gachaData","idolGacha"];
+  for(const key of keys){const parsed=safeParse(localStorage.getItem(key));if(parsed && (parsed.characters||parsed.characterList||parsed.owned||parsed.cards||parsed.inventory))return parsed;}
+  // Conservative fallback: look for a recognizable old JSON save without deleting it.
+  for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k)continue;const p=safeParse(localStorage.getItem(k));if(p&&typeof p==="object"&&(p.characters||p.characterList)&&!Array.isArray(p))return p;}
+  return null;
+}
+function load(){
+  let raw=safeParse(localStorage.getItem(SAVE_KEY));
+  if(!raw){raw=findLegacy();}
+  state=normalizeState(raw);
+  save();
+}
+function save(){state.version=VERSION;try{localStorage.setItem(SAVE_KEY,JSON.stringify(state));}catch(e){console.error(e);setText("backupMessage","保存容量が不足している可能性があります。画像を小さくするかバックアップしてください。");}}
+function setText(id,txt){const el=$(id);if(el)el.textContent=txt;}
+function charForOwned(o){return state.characters.find(c=>c.id===o.characterId);}
+function displayName(o){const c=charForOwned(o);return c?c.name:"不明なカード";}
+function effectiveStats(o){const c=charForOwned(o);if(!c)return {looks:0,style:0};const delta=(o.level-1)*.5;return {looks:Math.floor(Math.min(100,c.looks+delta)),style:Math.floor(Math.min(100,c.style+delta))};}
+function totalExpForNext(o){return EXP_NEXT(o.level);}
+function addOwned(ch){state.owned.push({id:uid(),characterId:ch.id,level:1,exp:0,awakenings:0,favorite:false,obtainedAt:now()});}
+function tick(){
+  const t=now();
+  if(state.stamina<MAX_STAMINA){const elapsed=Math.max(0,t-(state.staminaUpdatedAt||t));const recovered=Math.floor(elapsed/STAMINA_MS);if(recovered>0){const newVal=Math.min(MAX_STAMINA,state.stamina+recovered);state.stamina=newVal;state.staminaUpdatedAt=newVal>=MAX_STAMINA?t:(state.staminaUpdatedAt+recovered*STAMINA_MS);}}
+  else state.staminaUpdatedAt=t;
+  const ticketElapsed=Math.max(0,t-(state.ticketUpdatedAt||t));const gained=Math.floor(ticketElapsed/TICKET_MS);if(gained>0){state.tickets+=gained;state.ticketUpdatedAt+=gained*TICKET_MS;}
+  if(state.specialDate!==localDate()){state.specialDate=localDate();state.specialUsed=0;}
+  save();renderResources();
+}
+function renderResources(){
+  setText("tickets",state.tickets);setText("stamina",`${Math.floor(state.stamina)}/${MAX_STAMINA}`);
+  if(state.stamina>=MAX_STAMINA)setText("staminaTimer","満タン");
+  else {const rem=STAMINA_MS-Math.max(0,now()-state.staminaUpdatedAt)%STAMINA_MS;setText("staminaTimer",`次の回復 ${fmtTime(rem)}`);}
+  setText("homeChars",state.characters.length);setText("homeOwned",state.owned.length);setText("homeFavs",state.owned.filter(o=>o.favorite).length);
+}
+function fmtTime(ms){const s=Math.ceil(ms/1000);return `${Math.floor(s/3600)}:${String(Math.floor(s%3600/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;}
+function imgMarkup(ch,locked=false){if(ch?.image)return `<img alt="" src="${ch.image}">`;return `<div class="portrait-placeholder">${locked?"?":"✦"}</div>`;}
+function ownedCardHTML(o,actions=true){
+  const ch=charForOwned(o);if(!ch)return "";
+  const stats=effectiveStats(o);
+  return `<article class="idol-card r-${ch.rarity}"><div class="card-art">${imgMarkup(ch)}</div><div class="rarity">${ch.rarity} ${"✦".repeat(o.awakenings)}</div><h4>${esc(ch.name)}</h4><div class="small">Lv.${o.level}/${CAPS[ch.rarity]}</div><div class="small">ルックス ${stats.looks} · スタイル ${stats.style}</div>${actions?`<div class="card-actions"><button class="secondary" data-fav="${o.id}">${o.favorite?"★":"☆"}</button><button class="secondary" data-details="${o.id}">詳細</button></div>`:""}</article>`;
+}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function renderCollection(){
+  const q=($("searchCards").value||"").trim().toLowerCase(),rarity=$("rarityFilter").value,filter=$("ownedFilter").value;
+  const catalog=state.characters.filter(c=>(!q||c.name.toLowerCase().includes(q))&&(!rarity||c.rarity===rarity)).map(ch=>{
+    const copies=state.owned.filter(o=>o.characterId===ch.id);if(filter==="owned"&&!copies.length)return "";if(filter==="missing"&&copies.length)return "";if(filter==="fav"&&!copies.some(o=>o.favorite))return "";
+    if(!copies.length)return `<article class="idol-card r-${ch.rarity} locked"><div class="card-art">${imgMarkup(ch,true)}<div class="locked-label">🔒</div></div><div class="rarity">${ch.rarity}</div><h4>未入手アイドル</h4><div class="small">図鑑登録済み</div></article>`;
+    return copies.map(o=>ownedCardHTML(o)).join("");
+  }).join("");
+  $("catalog").innerHTML=catalog||'<p class="muted">該当するカードがありません。</p>';
+  $("ownedCards").innerHTML=state.owned.map(o=>ownedCardHTML(o)).join("")||'<p class="muted">まだカードを所持していません。キャラクター登録後、ガチャを引いてみよう。</p>';
+  bindCardButtons();
+}
+function renderTrainingSelect(){
+  const select=$("trainingCard"),prev=select.value;
+  select.innerHTML=state.owned.map(o=>`<option value="${o.id}">${esc(displayName(o))}（Lv.${o.level}）</option>`).join("");
+  if(state.owned.some(o=>o.id===prev))select.value=prev;
+  renderTrainingInfo();
+}
+function renderTrainingInfo(){
+  const o=state.owned.find(x=>x.id===$("trainingCard").value),el=$("trainingInfo");
+  if(!o){el.innerHTML='<p class="muted">育成できる所持カードがありません。先にガチャを引いてね。</p>';return;}
+  const ch=charForOwned(o),stats=effectiveStats(o),need=EXP_NEXT(o.level),cap=CAPS[ch.rarity],atCap=o.level>=cap;
+  const pct=atCap?100:Math.min(100,o.exp/need*100);
+  const preview={looks:Math.floor(Math.min(100,ch.looks+(o.level)*.5)),style:Math.floor(Math.min(100,ch.style+(o.level)*.5))};
+  el.innerHTML=`<div class="team-member">${imgMarkup(ch)}<div class="grow"><b>${esc(ch.name)} · ${ch.rarity}</b><div>Lv.${o.level}/${cap}</div><div class="progress"><span style="width:${pct}%"></span></div><div class="small">${atCap?"最大レベルです":`${o.exp} / ${need} EXP`}</div></div></div><div class="form-grid"><div>ルックス <b>${stats.looks}</b>${!atCap?` <span class="small">→ ${preview.looks}</span>`:""}</div><div>スタイル <b>${stats.style}</b>${!atCap?` <span class="small">→ ${preview.style}</span>`:""}</div></div><p class="small muted">次のレベルで内部値が各+0.5（表示は小数点以下切り捨て）。</p>`;
+  document.querySelectorAll("[data-lesson]").forEach(b=>b.disabled=!state.owned.length||atCap);
+}
+function doLesson(kind){
+  const o=state.owned.find(x=>x.id===$("trainingCard").value);if(!o){setText("lessonMessage","先に所持カードを選んでね。");return;}
+  const ch=charForOwned(o),cost={vocal:20,dance:30,special:50}[kind],gain=cost;
+  if(o.level>=CAPS[ch.rarity]){setText("lessonMessage","このカードは最大レベルです。");return;}
+  if(state.stamina<cost){setText("lessonMessage",`スタミナが足りません（必要 ${cost}）。`);return;}
+  if(kind==="special"&&state.specialUsed>=3){setText("lessonMessage","今日の特別レッスンは3回使い切りました。");return;}
+  state.stamina-=cost;state.staminaUpdatedAt=state.stamina>=MAX_STAMINA?now():state.staminaUpdatedAt;
+  if(kind==="special")state.specialUsed++;
+  o.exp+=gain;let levels=0;
+  while(o.level<CAPS[ch.rarity]&&o.exp>=EXP_NEXT(o.level)){o.exp-=EXP_NEXT(o.level);o.level++;levels++;}
+  if(o.level>=CAPS[ch.rarity])o.exp=0;
+  save();renderResources();renderTrainingSelect();renderCollection();
+  setText("lessonMessage",`${kind==="vocal"?"ボーカル":kind==="dance"?"ダンス":"特別"}レッスン完了！ +${gain} EXP${levels?` · ${levels}レベルアップ！`:""}`);
+}
+function rarityRoll(){const r=Math.random();return r<.03?"SSR":r<.15?"SR":r<.50?"R":"N";}
+function pull(count){
+  if(state.tickets<count){setText("stage","ガチャ権が足りません");return;}
+  const pool=[];for(const rarity of RARITIES){state.characters.filter(c=>c.rarity===rarity).forEach(c=>pool.push(c));}
+  if(!pool.length){setText("stage","先に「カード管理」でキャラクターを登録してね");return;}
+  state.tickets-=count;const results=[];
+  for(let i=0;i<count;i++){const rarity=rarityRoll();let candidates=state.characters.filter(c=>c.rarity===rarity);if(!candidates.length)candidates=pool;const ch=candidates[Math.floor(Math.random()*candidates.length)];addOwned(ch);results.push({ch,o:state.owned[state.owned.length-1]});}
+  save();renderResources();renderCollection();renderTrainingSelect();
+  const best=results.reduce((a,x)=>RARITIES.indexOf(x.ch.rarity)>RARITIES.indexOf(a.ch.rarity)?x:a,results[0]);
+  const stage=$("stage");stage.className=`stage reveal ${best.ch.rarity.toLowerCase()}`;stage.innerHTML=`<div class="spotlight"></div><div class="stage-text">${best.ch.rarity==="SSR"?"SPECIAL LIVE!":best.ch.rarity==="SR"?"ENCORE!":"LIVE START!"}</div><div class="penlights">✦ ✧ ✦ ✧ ✦ ✧ ✦</div>`;
+  const show=$("skipShow").checked;const resultsEl=$("gachaResults");
+  resultsEl.innerHTML=results.map(({ch,o},i)=>`<article class="idol-card result-card r-${ch.rarity}" style="animation-delay:${show?0:i*.12}s">${imgMarkup(ch)}<div class="rarity">${ch.rarity}</div><h4>${esc(ch.name)}</h4><div class="small">${state.owned.filter(x=>x.characterId===ch.id).length>1?"重複カード":"NEW!"}</div></article>`).join("");
+  if(!show){stage.scrollIntoView({behavior:"smooth",block:"center"});}
+}
+function bindCardButtons(){
+  document.querySelectorAll("[data-fav]").forEach(b=>b.onclick=()=>{const o=state.owned.find(x=>x.id===b.dataset.fav);if(o){o.favorite=!o.favorite;save();renderCollection();renderResources();}});
+  document.querySelectorAll("[data-details]").forEach(b=>b.onclick=()=>showDetails(b.dataset.details));
+}
+function showDetails(id){
+  const o=state.owned.find(x=>x.id===id),ch=o&&charForOwned(o);if(!o||!ch)return;
+  const stats=effectiveStats(o);
+  $("modalContent").innerHTML=`${imgMarkup(ch)}<p class="rarity">${ch.rarity}</p><h2>${esc(ch.name)}</h2><p>Lv.${o.level}/${CAPS[ch.rarity]} · 覚醒 ${o.awakenings}/5</p><p>ルックス ${stats.looks} · スタイル ${stats.style}</p><div class="button-row"><button id="detailFav">${o.favorite?"お気に入り解除":"お気に入り登録"}</button><button id="awaken" class="secondary">重複カードで覚醒</button></div><p class="small muted">覚醒は同じレアリティのカードを1枚消費。能力値は上がらず、見た目の演出用です。</p><p id="detailMessage" class="message"></p>`;
+  $("modal").hidden=false;
+  $("detailFav").onclick=()=>{o.favorite=!o.favorite;save();$("modal").hidden=true;renderCollection();renderResources();};
+  $("awaken").onclick=()=>{const material=state.owned.find(x=>x.id!==o.id&&charForOwned(x)?.rarity===ch.rarity);if(o.awakenings>=5){setText("detailMessage","最大覚醒です。");return;}if(!material){setText("detailMessage","同じレアリティの重複カードが必要です。");return;}state.owned=state.owned.filter(x=>x.id!==material.id);o.awakenings++;save();$("modal").hidden=true;renderCollection();renderTrainingSelect();};
+}
+function renderTeams(){
+  if(!state.teams.length)state.teams.push({id:uid(),name:"メインチーム",memberIds:[],leaderId:null});
+  if(!currentTeamId||!state.teams.some(t=>t.id===currentTeamId))currentTeamId=state.teams[0].id;
+  $("teamSelect").innerHTML=state.teams.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("");$("teamSelect").value=currentTeamId;
+  const t=state.teams.find(x=>x.id===currentTeamId);
+  $("teamEditor").innerHTML=`<label>チーム名<input id="editTeamName" value="${esc(t.name)}" maxlength="50"></label><button id="saveTeamName" class="secondary">チーム名を保存</button><h3>メンバーを選択</h3><p class="small muted">チーム人数に固定上限はありません。リーダーはチームメンバーから選びます。</p>${state.owned.map(o=>{const ch=charForOwned(o),checked=t.memberIds.includes(o.id);return `<div class="team-member">${imgMarkup(ch)}<div class="grow"><b>${esc(displayName(o))}</b><div class="small">Lv.${o.level} · ${ch.rarity}</div></div><button data-team-toggle="${o.id}" class="secondary">${checked?"解除":"追加"}</button>${t.leaderId===o.id?'<span title="リーダー">👑</span>':checked?`<button data-leader="${o.id}" class="secondary">リーダー</button>`:""}</div>`;}).join("")||'<p class="muted">カードを所持すると選択できます。</p>'}<button id="deleteTeam" class="danger">このチームを削除</button>`;
+  $("saveTeamName").onclick=()=>{t.name=$("editTeamName").value.trim()||"マイチーム";save();renderTeams();};
+  document.querySelectorAll("[data-team-toggle]").forEach(b=>b.onclick=()=>{const id=b.dataset.teamToggle;if(t.memberIds.includes(id)){t.memberIds=t.memberIds.filter(x=>x!==id);if(t.leaderId===id)t.leaderId=null;}else t.memberIds.push(id);save();renderTeams();});
+  document.querySelectorAll("[data-leader]").forEach(b=>b.onclick=()=>{t.leaderId=b.dataset.leader;save();renderTeams();});
+  $("deleteTeam").onclick=()=>{if(state.teams.length===1){t.name="メインチーム";t.memberIds=[];t.leaderId=null;}else{state.teams=state.teams.filter(x=>x.id!==t.id);currentTeamId=state.teams[0].id;}save();renderTeams();};
+}
+function exportBackup(){
+  const blob=new Blob([JSON.stringify({app:"My Idol Gacha",version:VERSION,exportedAt:new Date().toISOString(),data:state},null,2)],{type:"application/json"});
+  const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download=`my-idol-gacha-backup-${localDate()}.json`;a.click();URL.revokeObjectURL(url);setText("backupMessage","バックアップを書き出しました。ファイルを安全な場所に保管してください。");
+}
+function importBackup(file){
+  const reader=new FileReader();reader.onload=()=>{const parsed=safeParse(reader.result);const raw=parsed?.data||parsed;if(!raw||typeof raw!=="object"||(!Array.isArray(raw.characters)&&!Array.isArray(raw.characterList))){setText("backupMessage","バックアップ形式を読み取れませんでした。元のJSONファイルを選んでください。");return;}if(!confirm("現在の保存データをバックアップの内容に置き換えます。先に現在のデータを書き出しましたか？"))return;state=normalizeState(raw);save();renderAll();setText("backupMessage","バックアップを復元しました。");};reader.readAsText(file);}
+function registerCharacter(e){
+  e.preventDefault();const name=$("charName").value.trim();if(!name)return;
+  const file=$("charImage").files[0],base={id:uid(),name,rarity:$("charRarity").value,looks:clamp(Number($("charLooks").value),0,100),style:clamp(Number($("charStyle").value),0,100),image:"",createdAt:now()};
+  const finish=()=>{state.characters.push(base);save();renderAll();$("characterForm").reset();$("charLooks").value=50;$("charStyle").value=50;setText("registerMessage",`${name} を図鑑に登録しました。ガチャで入手できるようになりました。`);};
+  if(file){if(file.size>2.5*1024*1024){setText("registerMessage","画像が大きすぎます。2.5MB以下の画像を選んでください。");return;}const r=new FileReader();r.onload=()=>{base.image=r.result;finish();};r.readAsDataURL(file);}else finish();
+}
+function renderAll(){renderResources();renderCollection();renderTrainingSelect();renderTeams();}
+function switchTab(name){document.querySelectorAll(".page").forEach(p=>p.classList.toggle("active",p.id===name));document.querySelectorAll(".tab").forEach(b=>b.classList.toggle("active",b.dataset.tab===name));if(name==="teams")renderTeams();if(name==="training")renderTrainingSelect();if(name==="collection"||name==="manage")renderCollection();}
+function init(){
+  load();tick();renderAll();
+  document.querySelectorAll(".tab").forEach(b=>b.onclick=()=>switchTab(b.dataset.tab));
+  document.querySelectorAll("[data-go]").forEach(b=>b.onclick=()=>switchTab(b.dataset.go));
+  $("pullOne").onclick=()=>pull(1);$("pullTen").onclick=()=>pull(10);
+  $("characterForm").addEventListener("submit",registerCharacter);
+  $("trainingCard").onchange=renderTrainingInfo;
+  document.querySelectorAll("[data-lesson]").forEach(b=>b.onclick=()=>doLesson(b.dataset.lesson));
+  ["searchCards","rarityFilter","ownedFilter"].forEach(id=>$(id).addEventListener(id==="searchCards"?"input":"change",renderCollection));
+  $("createTeam").onclick=()=>{const name=$("newTeamName").value.trim()||`チーム${state.teams.length+1}`;const t={id:uid(),name,memberIds:[],leaderId:null};state.teams.push(t);currentTeamId=t.id;$("newTeamName").value="";save();renderTeams();};
+  $("teamSelect").onchange=()=>{currentTeamId=$("teamSelect").value;renderTeams();};
+  $("exportBackup").onclick=exportBackup;$("backupTop").onclick=()=>{switchTab("manage");$("backupPanel").scrollIntoView({behavior:"smooth"});};
+  $("importButton").onclick=()=>$("importFile").click();$("importFile").onchange=e=>{if(e.target.files[0])importBackup(e.target.files[0]);e.target.value="";};
+  $("resetData").onclick=()=>{if(confirm("本当にすべての保存データを削除しますか？先にバックアップを取ることをおすすめします。")&&confirm("この操作は取り消せません。本当に削除しますか？")){localStorage.removeItem(SAVE_KEY);state=defaultState();save();renderAll();setText("backupMessage","このアプリの保存データを削除しました。");}};
+  $("closeModal").onclick=()=>$("modal").hidden=true;$("modal").onclick=e=>{if(e.target===$("modal"))$("modal").hidden=true;};
+  setInterval(()=>{tick();if($("training").classList.contains("active"))renderTrainingInfo();},1000);
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden){tick();renderAll();}});
+}
+init();
+})();

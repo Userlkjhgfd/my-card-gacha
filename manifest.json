@@ -1,10 +1,9 @@
 {
-  "name": "My Card Gacha",
-  "short_name": "Card Gacha",
-  "description": "自分専用のカード収集・育成ガチャ",
-  "start_url": "./index.html",
+  "name": "My Idol Gacha",
+  "short_name": "Idol Gacha",
+  "start_url": "./",
   "display": "standalone",
-  "background_color": "#100f1d",
-  "theme_color": "#17152a",
-  "icons": []
+  "background_color": "#100e1b",
+  "theme_color": "#171329",
+  "description": "自分専用のアイドルガチャ・育成アプリ"
 }

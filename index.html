@@ -1,112 +1,101 @@
 <!doctype html>
 <html lang="ja">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#17152a">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<title>My Card Gacha</title>
-<link rel="manifest" href="manifest.json">
-<link rel="stylesheet" href="style.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#171329">
+  <title>My Idol Gacha</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header class="topbar">
-  <div><div class="eyebrow">PERSONAL CARD COLLECTION</div><h1>My Card Gacha</h1></div>
-  <div class="ticket"><span>🎟</span><div><b id="ticketCount">0</b><small>ガチャ権利</small></div></div>
+  <div><p class="eyebrow">MY PERSONAL IDOL GAME</p><h1>✦ My Idol Gacha</h1></div>
+  <button id="backupTop" class="ghost">データ保護</button>
 </header>
-<nav class="tabs" aria-label="メインメニュー">
-  <button class="tab active" data-page="gacha">ガチャ</button>
-  <button class="tab" data-page="collection">図鑑</button>
-  <button class="tab" data-page="team">チーム</button>
-  <button class="tab" data-page="lesson">レッスン</button>
-  <button class="tab" data-page="manage">カード登録</button>
+<section class="resourcebar">
+  <span>🎟 ガチャ権 <b id="tickets">0</b></span>
+  <span>⚡ スタミナ <b id="stamina">100/100</b></span>
+  <span class="muted" id="staminaTimer">満タン</span>
+</section>
+<nav class="tabs" aria-label="メニュー">
+  <button class="tab active" data-tab="home">ホーム</button>
+  <button class="tab" data-tab="gacha">ガチャ</button>
+  <button class="tab" data-tab="training">育成</button>
+  <button class="tab" data-tab="collection">図鑑</button>
+  <button class="tab" data-tab="teams">チーム</button>
+  <button class="tab" data-tab="manage">カード管理</button>
 </nav>
 <main>
-<section class="page active" id="page-gacha">
-  <div class="hero panel">
-    <div class="eyebrow">ONE TICKET EVERY HOUR</div>
-    <h2>次の1枚との出会い。</h2>
-    <p>ガチャ権利は1時間ごとに1回分追加。使わなかった分は蓄積されます。</p>
-    <div class="ticket-line"><span>所持権利</span><strong id="ticketCountLarge">0回</strong></div>
-    <p class="muted" id="nextTicket">次の権利を計算中…</p>
-    <div class="actions"><button class="primary" id="pullOne">1回引く</button><button class="secondary" id="pullTen">10連で引く</button></div>
-  </div>
-  <div class="panel">
-    <div class="section-heading"><h3>排出対象</h3><button class="text-btn" data-goto="manage">キャラを登録 →</button></div>
-    <div class="rarities"><span class="rarity n">N</span><span class="rarity r">R</span><span class="rarity sr">SR</span><span class="rarity ssr">SSR</span></div>
-    <p class="muted">登録したキャラクターのうち「ガチャ対象」がONのカードから抽選します。排出率は登録済みカードのレアリティに応じた重み付けです。</p>
-  </div>
-  <div id="recentPulls" class="panel"><h3>最近の獲得</h3><p class="muted">まだガチャ結果はありません。</p></div>
-</section>
-
-<section class="page" id="page-collection">
-  <div class="section-heading"><div><div class="eyebrow">YOUR ARCHIVE</div><h2>カード図鑑</h2></div><span id="collectionCount" class="pill">0枚</span></div>
-  <div class="filters panel">
-    <input id="searchCards" placeholder="名前で検索">
-    <select id="rarityFilter"><option value="">全レアリティ</option><option>N</option><option>R</option><option>SR</option><option>SSR</option></select>
-    <select id="sortCards"><option value="newest">入手順（新しい順）</option><option value="name">名前順</option><option value="rarity">レアリティ順</option><option value="looks">looksが高い順</option><option value="style">styleが高い順</option><option value="level">レベルが高い順</option><option value="awakening">覚醒が高い順</option></select>
-  </div>
-  <div id="collectionGrid" class="card-grid"></div>
-</section>
-
-<section class="page" id="page-team">
-  <div class="section-heading"><div><div class="eyebrow">YOUR LINEUP</div><h2>選抜チーム</h2></div></div>
-  <div class="panel">
-    <label for="teamSize">チーム人数</label>
-    <div class="inline"><input id="teamSize" type="number" min="1" max="30" value="5"><button id="saveTeamSize" class="secondary">人数を設定</button></div>
-    <p class="muted">空き枠をタップして所持カードを選びます。人数は1〜30人で変更できます。</p>
-    <div class="team-stats"><div><small>合計 looks</small><b id="teamLooks">0</b></div><div><small>合計 style</small><b id="teamStyle">0</b></div></div>
-  </div>
-  <div id="teamSlots" class="team-slots"></div>
-</section>
-
-<section class="page" id="page-lesson">
-  <div class="section-heading"><div><div class="eyebrow">IDOL TRAINING</div><h2>レッスン</h2></div></div>
-  <div class="panel">
-    <div class="ticket-line"><span>スタミナ</span><strong><span id="staminaCount">100</span> / 100</strong></div>
-    <div class="stamina-track"><div id="staminaBar" class="stamina-fill"></div></div>
-    <p id="staminaRecovery" class="muted">スタミナは5分ごとに1回復します。満タン時は回復時間が止まります。</p>
-    <p class="muted">アプリを閉じている間も回復します。</p>
-  </div>
-  <div class="panel form">
-    <label for="lessonCard">レッスンするアイドル</label>
-    <select id="lessonCard"><option value="">所持カードから選択</option></select>
-    <div class="lesson-options">
-      <button class="primary" data-lesson="vocal">🎤 ボーカル<br><small>スタミナ20 / +20 EXP</small></button>
-      <button class="secondary" data-lesson="dance">💃 ダンス<br><small>スタミナ30 / +30 EXP</small></button>
-      <button class="secondary" data-lesson="special">✨ 特別レッスン<br><small>スタミナ50 / +50 EXP・1日3回</small></button>
+  <section id="home" class="page active">
+    <div class="hero panel">
+      <p class="eyebrow">THE SHOW IS ABOUT TO BEGIN</p>
+      <h2>あなたのアイドルたちと、<br>次のステージへ。</h2>
+      <p>カードを集めて、レッスンして、自分だけのチームを作ろう。</p>
+      <div class="hero-lights" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
     </div>
-    <p id="lessonMessage" class="muted">カードを選んでレッスンを始めよう。</p>
-  </div>
-  <div class="panel"><h3>レッスンのルール</h3><p class="muted">次のレベルに必要な経験値：50 + 10 ×（現在Lv. − 1）。レアリティ別の最大Lv.は N=20、R=30、SR=40、SSR=50。レベルアップごとに looks・style がそれぞれ内部値で+0.5（表示は小数点以下切り捨て）されます。</p></div>
-</section>
-
-<section class="page" id="page-manage">
-  <div class="section-heading"><div><div class="eyebrow">CARD STUDIO</div><h2>キャラクター登録</h2></div></div>
-  <form id="cardForm" class="panel form">
-    <input type="hidden" id="editingId">
-    <label>キャラクター画像<input id="cardImage" type="file" accept="image/*"></label>
-    <div id="imagePreview" class="image-preview"><span>画像プレビュー</span></div>
-    <label>キャラクター名<input id="cardName" required maxlength="60" placeholder="例：キャラクターA"></label>
-    <label>レアリティ<select id="cardRarity"><option>N</option><option>R</option><option>SR</option><option>SSR</option></select></label>
-    <div class="two-col">
-      <label>初期 looks（0〜100）<input id="cardLooks" type="number" min="0" max="100" value="50" required></label>
-      <label>初期 style（0〜100）<input id="cardStyle" type="number" min="0" max="100" value="50" required></label>
+    <div class="stats-grid">
+      <div class="panel"><span class="muted">登録キャラクター</span><strong id="homeChars">0</strong></div>
+      <div class="panel"><span class="muted">所持カード</span><strong id="homeOwned">0</strong></div>
+      <div class="panel"><span class="muted">お気に入り</span><strong id="homeFavs">0</strong></div>
     </div>
-    <label>レベルアップごとの能力値上昇量 <small>（固定：looks・style 各+0.5）</small><input id="growthRate" type="number" min="0.5" max="0.5" step="0.5" value="0.5" readonly></label>
-    <label class="check"><input id="gachaEnabled" type="checkbox" checked> ガチャの排出対象にする</label>
-    <div class="actions"><button class="primary" type="submit">カードを保存</button><button class="secondary" type="button" id="cancelEdit" hidden>編集をキャンセル</button></div>
-    <p class="muted">登録した時点では図鑑マスターに追加されます。ガチャで獲得するとLv.1の所持カードになります。</p>
-  </form>
-  <div class="section-heading"><h3>登録済みキャラクター</h3></div>
-  <div id="masterList" class="master-list"></div>
-  <div class="panel danger-zone"><h3>データ管理</h3><p class="muted">このブラウザ内に保存されます。ブラウザのデータ消去で消える可能性があるため、定期的にバックアップしてください。</p><div class="actions"><button class="secondary" id="exportData">バックアップを書き出す</button><label class="secondary file-button">バックアップを読み込む<input id="importData" type="file" accept="application/json"></label></div><button class="danger" id="resetAll">すべてのデータを削除</button></div>
-</section>
+    <div class="panel"><h3>クイックメニュー</h3><div class="button-row"><button data-go="gacha">ガチャを引く</button><button data-go="training" class="secondary">レッスンする</button><button data-go="collection" class="secondary">図鑑を見る</button></div></div>
+    <p class="small muted">データはこのブラウザ内に保存されます。ブラウザのデータ消去や端末変更に備え、定期的にバックアップしてください。</p>
+  </section>
+
+  <section id="gacha" class="page">
+    <div class="panel stage-panel">
+      <p class="eyebrow">LIVE SUMMON</p><h2>ライブガチャ</h2>
+      <p>照明が点灯し、ステージからカードが登場！</p>
+      <div id="stage" class="stage" aria-live="polite"><div class="spotlight"></div><div class="stage-text">READY?</div><div class="penlights">✦ ✧ ✦ ✧ ✦ ✧ ✦</div></div>
+      <div class="button-row"><button id="pullOne">単発ガチャ ×1</button><button id="pullTen">10連ガチャ ×10</button></div>
+      <label class="checkline"><input type="checkbox" id="skipShow"> 演出をスキップ</label>
+      <div id="gachaResults" class="card-grid"></div>
+    </div>
+    <div class="panel"><h3>提供割合</h3><p class="small">SSR 3% / SR 12% / R 35% / N 50%。個人用アプリの初期設定です。必要に応じて app.js の確率を変更できます。</p></div>
+  </section>
+
+  <section id="training" class="page">
+    <div class="panel"><h2>レッスン</h2><p class="muted">カードを選び、レッスンで経験値を獲得しよう。</p>
+      <label>育成するカード<select id="trainingCard"></select></label>
+      <div id="trainingInfo" class="training-info"></div>
+      <div class="lesson-grid">
+        <button class="lesson" data-lesson="vocal"><b>🎤 ボーカル</b><span>スタミナ20 / +20 EXP</span></button>
+        <button class="lesson" data-lesson="dance"><b>💃 ダンス</b><span>スタミナ30 / +30 EXP</span></button>
+        <button class="lesson" data-lesson="special"><b>✨ 特別レッスン</b><span>スタミナ50 / +50 EXP</span><span class="muted">1日3回まで</span></button>
+      </div>
+      <p id="lessonMessage" class="message" role="status"></p>
+    </div>
+  </section>
+
+  <section id="collection" class="page">
+    <div class="panel"><h2>カード図鑑</h2><p class="muted">登録済みキャラクターを検索。未入手カードはシルエットで表示。</p>
+      <div class="filters"><input id="searchCards" placeholder="キャラクター名で検索"><select id="rarityFilter"><option value="">全レアリティ</option><option>N</option><option>R</option><option>SR</option><option>SSR</option></select><select id="ownedFilter"><option value="all">すべて</option><option value="owned">入手済み</option><option value="missing">未入手</option><option value="fav">お気に入り</option></select></div>
+      <div id="catalog" class="card-grid"></div>
+    </div>
+  </section>
+
+  <section id="teams" class="page">
+    <div class="panel"><h2>選抜チーム</h2><div class="button-row"><input id="newTeamName" placeholder="新しいチーム名"><button id="createTeam">チーム作成</button></div><label>編集中のチーム<select id="teamSelect"></select></label><div id="teamEditor"></div></div>
+  </section>
+
+  <section id="manage" class="page">
+    <div class="panel"><h2>キャラクター登録</h2><p class="muted">画像は端末内に保存されます。画像が大きいと保存容量を多く使います。</p>
+      <form id="characterForm">
+        <label>キャラクター名<input id="charName" required maxlength="80" placeholder="例：星野 ひかり"></label>
+        <label>レアリティ<select id="charRarity"><option>N</option><option>R</option><option>SR</option><option>SSR</option></select></label>
+        <div class="form-grid"><label>初期ルックス（0〜100）<input id="charLooks" type="number" min="0" max="100" value="50" required></label><label>初期スタイル（0〜100）<input id="charStyle" type="number" min="0" max="100" value="50" required></label></div>
+        <label>キャラクター画像<input id="charImage" type="file" accept="image/*"></label>
+        <button type="submit">キャラクターを登録</button>
+      </form>
+      <p id="registerMessage" class="message" role="status"></p>
+    </div>
+    <div class="panel"><h2>所持カード</h2><div id="ownedCards" class="card-grid"></div></div>
+    <div class="panel" id="backupPanel"><h2>セーブデータ保護</h2><p>バックアップには登録キャラクター、画像、所持カード、育成、チームなどの保存データが含まれます。</p><div class="button-row"><button id="exportBackup">バックアップを書き出す</button><button id="importButton" class="secondary">バックアップを復元</button><input id="importFile" type="file" accept=".json,application/json" hidden></div><p class="small muted">復元すると現在の保存データを置き換えます。先に現在のデータをバックアップしてください。</p><p id="backupMessage" class="message" role="status"></p><button id="resetData" class="danger">すべての保存データを削除</button></div>
+  </section>
 </main>
-
-<div id="modal" class="modal" hidden><div class="modal-backdrop" data-close="true"></div><div class="modal-content"><button class="close" id="closeModal">×</button><div id="modalBody"></div></div></div>
-<div id="toast" class="toast" role="status"></div>
+<div id="modal" class="modal" hidden><div class="modal-card"><button id="closeModal" class="modal-close" aria-label="閉じる">×</button><div id="modalContent"></div></div></div>
+<footer>MY IDOL GACHA · 個人用</footer>
 <script src="app.js"></script>
 </body>
 </html>
