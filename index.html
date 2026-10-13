@@ -19,6 +19,7 @@
   <button class="tab active" data-page="gacha">ガチャ</button>
   <button class="tab" data-page="collection">図鑑</button>
   <button class="tab" data-page="team">チーム</button>
+  <button class="tab" data-page="lesson">レッスン</button>
   <button class="tab" data-page="manage">カード登録</button>
 </nav>
 <main>
@@ -60,6 +61,27 @@
   <div id="teamSlots" class="team-slots"></div>
 </section>
 
+<section class="page" id="page-lesson">
+  <div class="section-heading"><div><div class="eyebrow">IDOL TRAINING</div><h2>レッスン</h2></div></div>
+  <div class="panel">
+    <div class="ticket-line"><span>スタミナ</span><strong><span id="staminaCount">100</span> / 100</strong></div>
+    <div class="stamina-track"><div id="staminaBar" class="stamina-fill"></div></div>
+    <p id="staminaRecovery" class="muted">スタミナは5分ごとに1回復します。満タン時は回復時間が止まります。</p>
+    <p class="muted">アプリを閉じている間も回復します。</p>
+  </div>
+  <div class="panel form">
+    <label for="lessonCard">レッスンするアイドル</label>
+    <select id="lessonCard"><option value="">所持カードから選択</option></select>
+    <div class="lesson-options">
+      <button class="primary" data-lesson="vocal">🎤 ボーカル<br><small>スタミナ20 / +20 EXP</small></button>
+      <button class="secondary" data-lesson="dance">💃 ダンス<br><small>スタミナ30 / +30 EXP</small></button>
+      <button class="secondary" data-lesson="special">✨ 特別レッスン<br><small>スタミナ50 / +50 EXP・1日3回</small></button>
+    </div>
+    <p id="lessonMessage" class="muted">カードを選んでレッスンを始めよう。</p>
+  </div>
+  <div class="panel"><h3>レッスンのルール</h3><p class="muted">次のレベルに必要な経験値：50 + 10 ×（現在Lv. − 1）。レアリティ別の最大Lv.は N=20、R=30、SR=40、SSR=50。レベルアップごとに looks・style がそれぞれ内部値で+0.5（表示は小数点以下切り捨て）されます。</p></div>
+</section>
+
 <section class="page" id="page-manage">
   <div class="section-heading"><div><div class="eyebrow">CARD STUDIO</div><h2>キャラクター登録</h2></div></div>
   <form id="cardForm" class="panel form">
@@ -72,7 +94,7 @@
       <label>初期 looks（0〜100）<input id="cardLooks" type="number" min="0" max="100" value="50" required></label>
       <label>初期 style（0〜100）<input id="cardStyle" type="number" min="0" max="100" value="50" required></label>
     </div>
-    <label>レベルごとの上昇量 <small>（仮設定。後から変更できます）</small><input id="growthRate" type="number" min="0" max="10" step="0.1" value="0.5"></label>
+    <label>レベルアップごとの能力値上昇量 <small>（固定：looks・style 各+0.5）</small><input id="growthRate" type="number" min="0.5" max="0.5" step="0.5" value="0.5" readonly></label>
     <label class="check"><input id="gachaEnabled" type="checkbox" checked> ガチャの排出対象にする</label>
     <div class="actions"><button class="primary" type="submit">カードを保存</button><button class="secondary" type="button" id="cancelEdit" hidden>編集をキャンセル</button></div>
     <p class="muted">登録した時点では図鑑マスターに追加されます。ガチャで獲得するとLv.1の所持カードになります。</p>
